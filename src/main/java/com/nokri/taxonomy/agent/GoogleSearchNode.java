@@ -1,5 +1,6 @@
 package com.nokri.taxonomy.agent;
 
+import com.nokri.taxonomy.log.AgentRunLog;
 import com.nokri.taxonomy.matching.DumpDomain;
 import com.nokri.taxonomy.search.CompanySearchClient;
 import com.nokri.taxonomy.search.SearchHit;
@@ -19,12 +20,24 @@ public class GoogleSearchNode implements NodeAction<MappingState> {
     @Override
     public Map<String, Object> apply(MappingState state) {
         String companyDomain = DumpDomain.companyDomainOrEmpty(state.dumpEmailWebsite());
+        String query = (companyDomain == null || companyDomain.isBlank())
+                ? state.dumpCompanyName() + " official company website"
+                : state.dumpCompanyName() + " " + companyDomain + " official company website";
+        AgentRunLog.googling(query, companyDomain);
         List<SearchHit> hits = searchClient.search(state.dumpCompanyName(), companyDomain);
+        SearchHit chosen = CompanyNameExtractor.choose(hits, companyDomain);
+        String official = CompanyNameExtractor.fromHits(hits, companyDomain);
+        boolean domainConfirmed = !companyDomain.isBlank()
+                && chosen != null
+                && (nullToEmpty(chosen.url()) + " " + nullToEmpty(chosen.snippet()) + " " + nullToEmpty(chosen.title()))
+                .toLowerCase()
+                .contains(companyDomain.toLowerCase());
+        AgentRunLog.googleFound(official, chosen == null ? "" : chosen.url(), domainConfirmed);
         Map<String, Object> update = new HashMap<>();
         update.put(MappingState.SEARCHED, true);
         update.put(MappingState.USED_GOOGLE, true);
         update.put(MappingState.COMPANY_DOMAIN, companyDomain);
-        update.put(MappingState.RESOLVED_NAME, CompanyNameExtractor.fromHits(hits, companyDomain));
+        update.put(MappingState.RESOLVED_NAME, official);
         update.put(MappingState.SEARCH_SNIPPETS, hits.stream().map(SearchHit::combinedText).toList());
         update.put(MappingState.ROUTE, "match");
         if (hits.isEmpty()) {
@@ -35,5 +48,9 @@ public class GoogleSearchNode implements NodeAction<MappingState> {
             update.put(MappingState.REASON, "google official name confirmed with domain " + companyDomain);
         }
         return update;
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 }

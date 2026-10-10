@@ -6,6 +6,7 @@ import com.nokri.taxonomy.domain.DumpKeyword;
 import com.nokri.taxonomy.domain.MappingResult;
 import com.nokri.taxonomy.excel.ExcelIO;
 import com.nokri.taxonomy.excel.SampleDataWriter;
+import com.nokri.taxonomy.log.AgentRunLog;
 import com.nokri.taxonomy.llm.CompanyJudge;
 import com.nokri.taxonomy.llm.LocalMlxLauncher;
 import com.nokri.taxonomy.llm.OpenAiCompatibleCompanyJudge;
@@ -25,6 +26,7 @@ public class CompanyMappingApplication {
 
     public static void main(String[] args) throws Exception {
         AppConfig config = AppConfig.fromEnv();
+        AgentRunLog.startNewRun();
         SampleDataWriter samples = new SampleDataWriter();
         if (!Files.exists(config.canonicalFile())) {
             samples.writeCanonical(config.canonicalFile());
@@ -57,12 +59,19 @@ public class CompanyMappingApplication {
         CompanyMappingGraph graph = new CompanyMappingGraph(index, searchClient, judge, config);
         List<DumpKeyword> dump = excel.readDump(config.dumpFile());
         List<MappingResult> results = new ArrayList<>();
+        int total = dump.size();
+        int rowNumber = 1;
         for (DumpKeyword keyword : dump) {
+            AgentRunLog.rowStart(rowNumber++, total, keyword.companyId(), keyword.companyName(), keyword.emailWebsite());
             MappingResult result = graph.map(keyword);
-            log.info("{} -> {} ({})", keyword.companyName(), result.matchStatus(), result.canonicalName());
+            AgentRunLog.rowEnd(result.matchStatus(), result.canonicalId(), result.canonicalName());
             results.add(result);
         }
         excel.writeMapping(config.mappingFile(), results);
+        AgentRunLog.info("Wrote mapping sheet to " + config.mappingFile());
+        AgentRunLog.info("Run log: " + AgentRunLog.file().toAbsolutePath());
+        AgentRunLog.close();
         log.info("Wrote mapping sheet to {}", config.mappingFile());
+        log.info("Row-by-row run log: {}", AgentRunLog.file().toAbsolutePath());
     }
 }

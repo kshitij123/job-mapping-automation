@@ -2,7 +2,7 @@
 
 This is the developer reference for **how the agent decides**, not how the Java is structured. If a rule, threshold, sheet column, or outcome changes in code, this file must change in the same change.
 
-**Last updated:** 2026-10-10 (exact dump name only; else Google + domain)
+**Last updated:** 2026-10-10 (per-row run log)
 
 ---
 
@@ -270,6 +270,7 @@ All of these are **environment variables**. Defaults are what the agent uses tod
 | `MLX_MODEL` | — | Alias for `LOCAL_LLM_MODEL` (used by `scripts/start-mlx-llm.sh`) |
 | `MLX_PORT` / `MLX_HOST` | `8080` / `127.0.0.1` | Only for the shell script, not read by Java |
 | `LOCAL_LLM_API_KEY` | `mlx-local` | Placeholder; MLX server does not require a real key |
+| `AGENT_RUN_LOG` | `logs/agent-run.log` | Per-row story log; wiped and recreated on every agent start |
 
 **Hard-coded (not env) today** — change code *and* this file if you change them:
 
@@ -327,7 +328,23 @@ mvn exec:java
 3. Start `mlx_lm.server` on `127.0.0.1:8080`.
 4. If sample Excel files are missing, write `data/canonical.xlsx` and `data/dump.xlsx`.
 5. Map every dump keyword → write `data/mapping.xlsx`.
-6. When the job finishes (or you interrupt it), shut down the LLM as well.
+6. Write a fresh row-by-row story log at **`logs/agent-run.log`** (this file is deleted and recreated at every startup).
+7. When the job finishes (or you interrupt it), shut down the LLM as well.
+
+### Row-by-row run log
+
+Standard file: **`logs/agent-run.log`** (override with env `AGENT_RUN_LOG`).
+
+On each `./scripts/start-agent.sh` or `mvn exec:java`, the previous log is **cleared** and a new file is created. Each dump row is a block that says, in plain language, what happened, for example:
+
+- Canonical sheet already has exactly this name — no Google.
+- Dump name is not exact — I will Google.
+- Googling for `tcs tcs-india.com official company website`.
+- Official name from Google: `Tata Consultancy Services`.
+- Searching the canonical sheet for that official name — matched `TCS`.
+- Or: asking the local LLM because canonical had no confident match.
+
+The same lines are also printed on the console. Open `logs/agent-run.log` after a run to review every row.
 
 ### Stop (agent + local LLM)
 

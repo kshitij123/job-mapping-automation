@@ -9,3 +9,4 @@ target/
 data/mapping.xlsx
 .env
 *.log
+logs/*.log

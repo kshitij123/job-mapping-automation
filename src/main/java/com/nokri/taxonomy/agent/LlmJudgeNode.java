@@ -1,6 +1,7 @@
 package com.nokri.taxonomy.agent;
 
 import com.nokri.taxonomy.domain.CanonicalCompany;
+import com.nokri.taxonomy.log.AgentRunLog;
 import com.nokri.taxonomy.llm.CompanyJudge;
 import com.nokri.taxonomy.llm.LlmJudgement;
 import com.nokri.taxonomy.matching.CanonicalIndex;
@@ -35,6 +36,7 @@ public class LlmJudgeNode implements NodeAction<MappingState> {
         update.put(MappingState.USED_LLM, true);
         update.put(MappingState.ROUTE, "end");
         if (!judgement.isCompany()) {
+            AgentRunLog.llmResult("NOT_A_COMPANY", null, null, judgement.reason());
             update.put(MappingState.MATCH_STATUS, "NOT_A_COMPANY");
             update.put(MappingState.REASON, judgement.reason());
             return update;
@@ -50,12 +52,14 @@ public class LlmJudgeNode implements NodeAction<MappingState> {
         update.put(MappingState.MATCH_STATUS, "MAPPED");
         update.put(MappingState.MATCH_SCORE, 0.9);
         update.put(MappingState.REASON, "llm: " + reason);
+        AgentRunLog.llmResult("MAPPED", company.canonicalId(), company.canonicalName(), reason);
         return update;
     }
 
     private static Map<String, Object> unmatched(Map<String, Object> update, String reason) {
         update.put(MappingState.MATCH_STATUS, "UNMATCHED");
         update.put(MappingState.REASON, "llm: " + reason);
+        AgentRunLog.llmResult("UNMATCHED", null, null, reason);
         return update;
     }
 
