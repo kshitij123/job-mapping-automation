@@ -16,6 +16,13 @@ class CanonicalIndexTest {
     ));
 
     @Test
+    void exactWrittenRequiresSameSpellingAndCase() {
+        assertEquals("C1001", index.exactWritten("TCS").orElseThrow().canonicalId());
+        assertTrue(index.exactWritten("tcs").isEmpty());
+        assertTrue(index.exactWritten("Tata Consultancy Services").isEmpty());
+    }
+
+    @Test
     void mapsFullNameToCanonicalAcronym() {
         MatchCandidate hit = index.bestMatch("Tata Consultancy Services").orElseThrow();
         assertEquals("C1001", hit.company().canonicalId());

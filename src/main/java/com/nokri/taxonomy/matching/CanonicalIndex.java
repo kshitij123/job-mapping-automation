@@ -40,6 +40,23 @@ public class CanonicalIndex {
         return companies;
     }
 
+    /**
+     * Direct map is allowed only when the dump name is written exactly like a canonical name
+     * (trim only; case and spelling must match).
+     */
+    public Optional<CanonicalCompany> exactWritten(String name) {
+        if (name == null) {
+            return Optional.empty();
+        }
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) {
+            return Optional.empty();
+        }
+        return companies.stream()
+                .filter(company -> company.canonicalName().equals(trimmed))
+                .findFirst();
+    }
+
     public Optional<MatchCandidate> bestMatch(String... names) {
         MatchCandidate best = null;
         for (String name : names) {

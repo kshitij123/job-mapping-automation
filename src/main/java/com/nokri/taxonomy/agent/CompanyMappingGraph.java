@@ -11,6 +11,7 @@ import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.action.AsyncCommandAction;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -57,10 +58,10 @@ public class CompanyMappingGraph {
     }
 
     public MappingResult map(DumpKeyword keyword) {
-        Map<String, Object> input = Map.of(
-                MappingState.DUMP_COMPANY_ID, keyword.companyId(),
-                MappingState.DUMP_COMPANY_NAME, keyword.companyName()
-        );
+        Map<String, Object> input = new HashMap<>();
+        input.put(MappingState.DUMP_COMPANY_ID, keyword.companyId());
+        input.put(MappingState.DUMP_COMPANY_NAME, keyword.companyName());
+        input.put(MappingState.DUMP_EMAIL_WEBSITE, keyword.emailWebsite() == null ? "" : keyword.emailWebsite());
         MappingState finalState = graph.invoke(input).orElseThrow();
         return finalState.toResult();
     }

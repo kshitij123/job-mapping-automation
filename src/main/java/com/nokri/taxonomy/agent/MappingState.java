@@ -13,6 +13,8 @@ import java.util.Map;
 public class MappingState extends AgentState {
     public static final String DUMP_COMPANY_ID = "dumpCompanyId";
     public static final String DUMP_COMPANY_NAME = "dumpCompanyName";
+    public static final String DUMP_EMAIL_WEBSITE = "dumpEmailWebsite";
+    public static final String COMPANY_DOMAIN = "companyDomain";
     public static final String ROUTE = "route";
     public static final String SEARCHED = "searched";
     public static final String SEARCH_SNIPPETS = "searchSnippets";
@@ -43,6 +45,14 @@ public class MappingState extends AgentState {
 
     public String dumpCompanyName() {
         return string(DUMP_COMPANY_NAME);
+    }
+
+    public String dumpEmailWebsite() {
+        return string(DUMP_EMAIL_WEBSITE);
+    }
+
+    public String companyDomain() {
+        return string(COMPANY_DOMAIN);
     }
 
     public String route() {

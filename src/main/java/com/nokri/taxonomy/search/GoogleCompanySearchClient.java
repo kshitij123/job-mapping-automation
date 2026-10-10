@@ -22,8 +22,11 @@ public class GoogleCompanySearchClient implements CompanySearchClient {
     }
 
     @Override
-    public List<SearchHit> search(String keyword) {
-        WebSearchResults results = engine.search(keyword + " company official");
+    public List<SearchHit> search(String keyword, String companyDomain) {
+        String query = (companyDomain == null || companyDomain.isBlank())
+                ? keyword + " official company website"
+                : keyword + " " + companyDomain + " official company website";
+        WebSearchResults results = engine.search(query);
         List<SearchHit> hits = new ArrayList<>();
         if (results == null || results.results() == null) {
             return hits;
@@ -35,7 +38,7 @@ public class GoogleCompanySearchClient implements CompanySearchClient {
                     result.url() == null ? null : result.url().toString()
             ));
         }
-        log.info("Google returned {} hits for '{}'", hits.size(), keyword);
+        log.info("Google returned {} hits for query '{}'", hits.size(), query);
         return hits;
     }
 }

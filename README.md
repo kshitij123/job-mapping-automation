@@ -2,7 +2,7 @@
 
 This is the developer reference for **how the agent decides**, not how the Java is structured. If a rule, threshold, sheet column, or outcome changes in code, this file must change in the same change.
 
-**Last updated:** 2026-10-10 (start/stop lifecycle)
+**Last updated:** 2026-10-10 (exact dump name only; else Google + domain)
 
 ---
 
@@ -10,7 +10,7 @@ This is the developer reference for **how the agent decides**, not how the Java 
 
 Job seekers type keywords into a search box (monopoly.com / Naukri-style dump). Those keywords are messy: real company names, abbreviations, extra words like “jobs”, or junk such as emails and phone numbers.
 
-The agent takes each dump keyword and tries to map it to **one** company in the canonical sheet (the unique, official list). It prefers cheap local matching. It searches Google only when local matching is not confident. It calls an LLM only when matching is still uncertain after search.
+The agent takes each dump keyword and tries to map it to **one** company in the canonical sheet (the unique, official list). Without the LLM it maps **only** when the dump `companyName` is written **exactly** like a canonical name. Any other spelling goes to Google (using the dump domain when it is a company domain, ignoring personal mailboxes like gmail). Google’s official name is then matched to canonical. The LLM runs only if that still fails.
 
 ---
 
@@ -29,14 +29,17 @@ Header row is skipped. Empty id/name rows are ignored. First sheet only.
 
 ### 2. Dump sheet (keyword search log)
 
-Default path: `data/dump.xlsx` (override with `DUMP_FILE`).
+Default path: `data/dump.xlsx` (override with `DUMP_FILE`). Production dumps look like `data/dump-original.xlsx`. Sample `dump.xlsx` uses the same columns, with dummy names chosen against `canonical.xlsx` so mapping can be tested.
 
 | Column | Meaning |
 |---|---|
-| `company_id` | System-generated ID for that search keyword (sample uses 5-digit IDs like `67435`) |
-| `company_name` | **Exactly what the user typed**, not a cleaned company name |
+| `naukriCompanyId` | System-generated ID for that company/keyword row (digits such as `750299`) |
+| `companyName` | **Exactly the company/keyword string from the dump**, not a cleaned name |
+| `emailWebsite` | Contact email or site from the dump. Company domains (e.g. `hr@tcs-india.com`) are used to confirm Google results. Personal mailboxes (gmail, yahoo, …) are ignored. |
 
-If these files are missing on first run, the app writes a small sample canonical + dump so you can try the agent.
+The agent maps using `naukriCompanyId` + `companyName`. Header row is skipped. Empty id/name rows are ignored. First sheet only.
+
+If `data/canonical.xlsx` or `data/dump.xlsx` is missing on first run, the app writes a small sample of each. It does **not** overwrite an existing dump.
 
 ### 3. Mapping sheet (agent output)
 
@@ -74,16 +77,20 @@ The agent processes **one keyword at a time**.
 Keyword
   → 1. Classify (is this even a company-like string?)
        no  → NOT_A_COMPANY   (stop; no Google, no LLM)
-       yes → 2. Local match against canonical
-               score ≥ accept threshold → MAPPED   (stop)
-               else → 3. Search (Google if configured, else offline demo)
-                      → 4. Local match again, now also using the search title
+       yes → 2. Exact written match to canonical companyName
+               dump name equals a canonical name (trim only, case-sensitive) → MAPPED   (stop; no Google, no LLM)
+               else → 3. Google search
+                        company dump email/website host is a company domain → search "{name} {domain} official company website"
+                          prefer a result whose URL/snippet contains that domain
+                        host is personal (gmail, yahoo, yopmail, …) or empty → ignore domain; search "{name} official company website"
+                      → 4. Take official company name from the Google title
+                      → 5. Match that official name to canonical (exact / acronym / fuzzy)
                             score ≥ accept threshold → MAPPED   (stop)
-                            still weak, LLM is on, score ≥ LLM threshold → 5. LLM judge
-                            otherwise → UNMATCHED   (stop)
+                            still weak, local LLM is on → 6. LLM judge
+                            otherwise → UNMATCHED
 ```
 
-Search never runs for emails/phones. LLM never runs if local matching already accepted a hit, or if `OPENAI_API_KEY` is missing.
+Search never runs for emails/phones in `companyName`. Direct map never uses acronyms or fuzzy on the dump string.
 
 ---
 
@@ -117,9 +124,20 @@ Words such as `consultancy`, `services`, `technologies` are **kept**, so `Tata C
 
 ---
 
-## Step 3 — Local matching rules (exact order)
+## Step 3 — Direct map (no Google, no LLM)
 
-The matcher scores the dump keyword, and after search it also scores the **resolved name** from the search title. The **higher** of those two scores wins.
+Allowed **only** when `companyName` in the dump is the same characters as a `canonical_name` after trim. Case, extra words, and abbreviations all count as a mismatch.
+
+| Dump `companyName` | Canonical | Direct map? |
+|---|---|---|
+| `TCS` | `TCS` | yes |
+| `tcs` | `TCS` | no → Google |
+| `Tata Consultancy Services` | `TCS` | no → Google |
+| `Infosys` | `Infosys Limited` | no → Google |
+
+## Step 3b — Matching the Google official name to canonical
+
+After search, the dump string is **not** scored. Only the official name from Google is scored against canonical. First rule that hits:
 
 It stops at the **first** rule that hits:
 
@@ -163,29 +181,35 @@ After a best score is known:
 | search **has** run, score **≥ `MATCH_LLM_SCORE`** (default **0.50**), and local LLM is enabled and reachable | go to LLM |
 | otherwise | `UNMATCHED` |
 
-All of exact (`1.00`), compact (`0.97`), acronym (`0.93`), and token-acronym (`0.91`) sit **above** the default accept threshold, so they map without Google or LLM.
+Example: dump `tcs` + `hr@tcs-india.com` → Google title `Tata Consultancy Services` on `tcs-india.com` → acronym of that official name maps to canonical `TCS`. Dump id `750299` stays on the mapping row.
+
+Those Google-name scores (`1.00` exact, `0.97` compact, `0.93` acronym, `0.91` token-acronym) sit above the default accept threshold, so a clear official name maps without the LLM.
 
 ---
 
 ## Step 4 — Search (Google, or offline fallback)
 
-Runs only when local matching did not accept.
+Runs when the dump name is not an exact canonical spelling.
+
+**Dump domain** is parsed from `emailWebsite` (the part after `@`, or a URL host). These hosts are treated as **personal** and are **not** sent to Google or used for confirmation: `gmail.com`, `googlemail.com`, `yahoo.com`, `yahoo.co.in`, `ymail.com`, `hotmail.com`, `outlook.com`, `live.com`, `msn.com`, `icloud.com`, `aol.com`, `proton.me`, `protonmail.com`, `rediffmail.com`, `rediff.com`, `yopmail.com`, `pookmail.com`, `mail.com`, `example.com`, `example.org`, `demo.com`.
 
 **Live Google** when both are set:
 
 - `GOOGLE_API_KEY` (or `GOOGLE_CSE_API_KEY`)
 - `GOOGLE_CSE_ID` (or `GOOGLE_SEARCH_ENGINE_ID`)
 
-Query sent: `{keyword} company official`
+Queries:
+
+- company domain: `{companyName} {domain} official company website`
+- personal/empty email: `{companyName} official company website`
 
 **Otherwise** a small offline dictionary is used (demo only). Unknown keywords return no hits.
 
 From search results:
 
-- `resolved_company_name` = first result **title**, cut at the first ` - `, ` – `, ` \| `, or `:`
+- If a company domain was used, prefer a hit whose URL, title, or snippet contains that domain
+- `resolved_company_name` = chosen result **title**, cut at the first ` - `, ` – `, ` \| `, `:`, or ` (`
 - snippets are kept as evidence for the LLM
-
-Then matching runs again using **dump keyword and resolved name**. Example: dump `Reliance` may not exact-match `Reliance Industries`, search title becomes `Reliance Industries`, then exact match maps it.
 
 ---
 
@@ -194,9 +218,9 @@ Then matching runs again using **dump keyword and resolved name**. Example: dump
 Runs only when:
 
 - search already ran
-- best local score is still below accept, but **≥ `MATCH_LLM_SCORE`**
-- `LOCAL_LLM_ENABLED` is `true` (default)
-- the local OpenAI-compatible server answers at `LOCAL_LLM_BASE_URL` (health check: `GET …/v1/models`)
+- the Google official name did not map to canonical at the accept threshold
+- `LOCAL_LLM_ENABLED` is `true` (default) and the local server is up
+- either the best official-name score is **≥ `MATCH_LLM_SCORE`**, or Google returned a name that is not in the sheet
 
 **Default stack on Mac (Apple Silicon):** [MLX](https://github.com/ml-explore/mlx) via `mlx-lm`, model **`mlx-community/Qwen2.5-3B-Instruct-4bit`**. Chosen for this POC because the judge only emits a tiny JSON object (`isCompany` + optional `canonicalId`). A 3B instruct 4-bit model is fast on 24 GB, follows JSON instructions well, and does not spend tokens on “thinking” (unlike Qwen3 8B). Bigger models (`Qwen3-8B-4bit`, `Qwen3.5-9B-MLX-4bit`) are optional via `MLX_MODEL` if you later want more recall at the cost of speed.
 
@@ -256,6 +280,10 @@ All of these are **environment variables**. Defaults are what the agent uses tod
 - Fuzzy acronym boost `0.25`
 - Google query suffix ` company official`
 - Title split on ` - ` / ` – ` / ` \| ` / `:`
+- Direct map: dump name must equal canonical name after trim (case-sensitive)
+- Personal mailbox hosts listed in Step 4
+- Google query suffixes ` official company website`
+- Title split on ` - ` / ` – ` / ` \| ` / `:` / ` (`
 - LLM: top 5 candidates, mapped score `0.9`, prompt file, temperature `0`, max 256 tokens, HTTP/1.1, strip `<think>` if present
 - Sample IDs and names if you regenerate sample Excel
 
@@ -265,14 +293,11 @@ All of these are **environment variables**. Defaults are what the agent uses tod
 
 | Dump keyword | Result | Why |
 |---|---|---|
-| `Tata Consultancy Services` | `MAPPED` → `TCS` | Generated acronym `tcs` |
-| `TCS` | `MAPPED` → `TCS` | Exact |
-| `tcs jobs` | `MAPPED` → `TCS` | Token `tcs` (`jobs` dropped) |
-| `Infosys` / `infosys ltd` | `MAPPED` → `Infosys Limited` | Fuzzy after stop words |
-| `9876543210`, `john.doe@gmail.com`, `+91 9988776655` | `NOT_A_COMPANY` | Classify; no search, no LLM |
-| `Reliance` | `MAPPED` → `Reliance Industries` | Search title, then exact |
-| `xyzabc123 not a firm` | `UNMATCHED` | Looks like text, search has no evidence, score too low |
-| `HCL` | `MAPPED` → `HCL Technologies` | Acronym index from first token |
+| `TCS` (any email) | `MAPPED` → `TCS` | Exact written canonical name; no Google |
+| `tcs` + `hr@tcs-india.com` | `MAPPED` → `TCS` | Google official name Tata Consultancy Services, domain confirmed, then acronym to `TCS` |
+| `Infosys` + gmail | `MAPPED` → `Infosys Limited` | Personal email ignored; Google official name Infosys Limited |
+| `9876543210`, `john.doe@gmail.com` | `NOT_A_COMPANY` | Classify; no search, no LLM |
+| `demo11` + yahoo | `UNMATCHED` (or LLM) | Google finds nothing useful / not in canonical |
 
 ---
 

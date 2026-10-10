@@ -51,8 +51,9 @@ public class ExcelIO {
                 }
                 String id = cell(row, 0);
                 String name = cell(row, 1);
+                String email = cell(row, 2);
                 if (!id.isBlank() && !name.isBlank()) {
-                    rows.add(new DumpKeyword(id, name));
+                    rows.add(new DumpKeyword(id, name, email));
                 }
             }
             return rows;

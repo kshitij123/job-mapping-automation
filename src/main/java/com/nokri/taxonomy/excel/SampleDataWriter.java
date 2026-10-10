@@ -33,27 +33,33 @@ public class SampleDataWriter {
     }
 
     public void writeDump(Path file) throws IOException {
-        write(file, "dump", List.of("company_id", "company_name"), List.of(
-                List.of("67435", "Tata Consultancy Services"),
-                List.of("67436", "TCS"),
-                List.of("67481", "tcs jobs"),
-                List.of("68012", "Infosys"),
-                List.of("68044", "infosys ltd"),
-                List.of("69101", "9876543210"),
-                List.of("69102", "john.doe@gmail.com"),
-                List.of("70211", "Wipro"),
-                List.of("70245", "Accenture India"),
-                List.of("71008", "amazon"),
-                List.of("71009", "Google LLC"),
-                List.of("72100", "+91 9988776655"),
-                List.of("73321", "Microsoft"),
-                List.of("73390", "IBM India"),
-                List.of("74001", "Reliance"),
-                List.of("75110", "hdfc"),
-                List.of("76002", "Deloitte"),
-                List.of("77111", "xyzabc123 not a firm"),
-                List.of("78020", "Cognizant Technology Solutions"),
-                List.of("79015", "HCL")
+        write(file, "dump", List.of("naukriCompanyId", "companyName", "emailWebsite"), List.of(
+                List.of("750299", "Tata Consultancy Services", "hr@tcs-india.com"),
+                List.of("750300", "TCS", "recruiter@tcs.test"),
+                List.of("750301", "tcs jobs", "jobs@tcs.test"),
+                List.of("68012", "Infosys", "talent@infosys.com"),
+                List.of("68044", "infosys ltd", "campus@gmail.com"),
+                List.of("55547", "Google Ireland Limited", "sriram@google.com"),
+                List.of("71009", "Google LLC", "jobs@google.test"),
+                List.of("71008", "amazon", "hiring@amazon.test"),
+                List.of("70211", "Wipro", "careers@wipro.test"),
+                List.of("70245", "Accenture India", "in.careers@accenture.test"),
+                List.of("73321", "Microsoft", "recruiter@microsoft.test"),
+                List.of("73390", "IBM India", "ibm.jobs@ibm.test"),
+                List.of("74001", "Reliance", "hr@ril.test"),
+                List.of("75110", "hdfc", "careers@hdfcbank.test"),
+                List.of("76002", "Deloitte", "in.jobs@deloitte.test"),
+                List.of("78020", "Cognizant Technology Solutions", "india@cognizant.test"),
+                List.of("79015", "HCL", "careers@hcltech.test"),
+                List.of("79016", "Capgemini", "jobs@capgemini.test"),
+                List.of("79017", "Oracle India", "in.jobs@oracle.test"),
+                List.of("647527", "yashika testing one", "yashikatesting1@yopmail.com"),
+                List.of("166349", "demo11", "demo1@demo.com"),
+                List.of("158249", "jklmnl", "fgh@yahoo.com"),
+                List.of("152018", "bguspvtld", "tanzanite@gmail.com"),
+                List.of("138118", "all bpo company", "shaikhmohammedzuberahmed@gmail.com"),
+                List.of("69101", "9876543210", "phone.search@example.com"),
+                List.of("69102", "john.doe@gmail.com", "john.doe@gmail.com")
         ));
     }
 

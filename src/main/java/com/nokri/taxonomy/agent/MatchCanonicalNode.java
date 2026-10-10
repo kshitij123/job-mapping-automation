@@ -1,6 +1,7 @@
 package com.nokri.taxonomy.agent;
 
 import com.nokri.taxonomy.config.AppConfig;
+import com.nokri.taxonomy.domain.CanonicalCompany;
 import com.nokri.taxonomy.matching.CanonicalIndex;
 import com.nokri.taxonomy.matching.MatchCandidate;
 import org.bsc.langgraph4j.action.NodeAction;
@@ -20,22 +21,33 @@ public class MatchCanonicalNode implements NodeAction<MappingState> {
 
     @Override
     public Map<String, Object> apply(MappingState state) {
-        Optional<MatchCandidate> best = index.bestMatch(state.dumpCompanyName(), state.resolvedCompanyName());
         Map<String, Object> update = new HashMap<>();
+        if (!state.searched()) {
+            Optional<CanonicalCompany> exact = index.exactWritten(state.dumpCompanyName());
+            if (exact.isPresent()) {
+                CanonicalCompany hit = exact.get();
+                update.put(MappingState.CANONICAL_ID, hit.canonicalId());
+                update.put(MappingState.CANONICAL_NAME, hit.canonicalName());
+                update.put(MappingState.MATCH_STATUS, "MAPPED");
+                update.put(MappingState.MATCH_SCORE, 1.0);
+                update.put(MappingState.REASON, "dump name is written exactly as canonical");
+                update.put(MappingState.ROUTE, "end");
+                return update;
+            }
+            update.put(MappingState.ROUTE, "search");
+            update.put(MappingState.REASON, "dump name is not an exact canonical name");
+            return update;
+        }
+
+        Optional<MatchCandidate> best = index.bestMatch(state.resolvedCompanyName());
         if (best.isPresent() && best.get().score() >= config.acceptScore()) {
             MatchCandidate hit = best.get();
             update.put(MappingState.CANONICAL_ID, hit.company().canonicalId());
             update.put(MappingState.CANONICAL_NAME, hit.company().canonicalName());
             update.put(MappingState.MATCH_STATUS, "MAPPED");
             update.put(MappingState.MATCH_SCORE, hit.score());
-            update.put(MappingState.REASON, "local " + hit.method() + " match");
+            update.put(MappingState.REASON, "google official name matched canonical (" + hit.method() + ")");
             update.put(MappingState.ROUTE, "end");
-            return update;
-        }
-
-        if (!state.searched()) {
-            update.put(MappingState.ROUTE, "search");
-            best.ifPresent(hit -> update.put(MappingState.MATCH_SCORE, hit.score()));
             return update;
         }
 
@@ -46,11 +58,15 @@ public class MatchCanonicalNode implements NodeAction<MappingState> {
             return update;
         }
 
+        if (config.llmEnabled() && !state.resolvedCompanyName().isBlank()) {
+            update.put(MappingState.ROUTE, "llm");
+            update.put(MappingState.REASON, "google name not in canonical, ask llm");
+            return update;
+        }
+
         update.put(MappingState.MATCH_STATUS, "UNMATCHED");
         update.put(MappingState.MATCH_SCORE, best.map(MatchCandidate::score).orElse(0.0));
-        update.put(MappingState.REASON, state.searched()
-                ? "no confident canonical match after search"
-                : "no confident canonical match");
+        update.put(MappingState.REASON, "google official name not found in canonical");
         update.put(MappingState.ROUTE, "end");
         return update;
     }
