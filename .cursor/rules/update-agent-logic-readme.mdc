@@ -1,0 +1,11 @@
+---
+description: Keep README.md business logic in sync with agent code changes
+globs: src/main/java/**/*.java,src/main/resources/**/*,src/test/java/**/*.java
+alwaysApply: true
+---
+
+# Keep README.md in sync with agent behavior
+
+`README.md` is the developer-facing business spec for company mapping. After any change to matching, classify, search, LLM, Excel, prompts, config, or sample data, update `README.md` in the same change.
+
+Follow `.cursor/skills/update-agent-logic-readme/SKILL.md`. Do not finish a behavior change with a stale README.

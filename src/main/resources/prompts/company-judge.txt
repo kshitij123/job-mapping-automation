@@ -1,0 +1,17 @@
+Map a job-search keyword to one canonical company, or reject it.
+
+Return exactly one JSON object. No markdown. No extra words.
+
+Fields:
+- isCompany: true only if the keyword is a real company (not email, phone, person, or junk)
+- canonicalId: copy an id from CANDIDATES only if it is clearly the same company (aliases allowed, e.g. TCS = Tata Consultancy Services). Otherwise use empty string.
+- reason: a few words
+
+Example of the format (not the answer):
+{"isCompany":false,"canonicalId":"","reason":"not a company"}
+
+KEYWORD: {{keyword}}
+GOOGLE_EVIDENCE:
+{{evidence}}
+CANDIDATES:
+{{candidates}}

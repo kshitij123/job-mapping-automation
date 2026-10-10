@@ -1,0 +1,11 @@
+.venv-mlx/
+.run/
+target/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+data/mapping.xlsx
+.env
+*.log
